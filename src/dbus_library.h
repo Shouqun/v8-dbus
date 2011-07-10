@@ -1,7 +1,7 @@
 #ifndef _DBUS_LIBRARY_H
 #define _DBUS_LIBRARY_H
 
-#include <node.h>
+#include <v8.h>
 
 namespace dbus_library {
 
@@ -12,10 +12,10 @@ public:
   ~DBusExtension();
 
 public:
-  static v8::Handle<v8::Value> Initialize(v8::Handle<v8::Object> handle);
+  static v8::Handle<v8::Value> Initialize(v8::Handle<v8::Object>& handle);
 
 public:
-  static v8::Handle<v8::Value> New(v8::Arguments& args);
+  static v8::Handle<v8::Value> New(const v8::Arguments& args);
 
 	static v8::Handle<v8::Value> SessionBus(const v8::Arguments& args);
   
@@ -27,7 +27,8 @@ public:
 
   static v8::Handle<v8::Value> GetSignal(const v8::Arguments& args);
 
-  
+public:
+  static v8::Persistent<v8::ObjectTemplate> g_conn_template_;
 };
 
 }

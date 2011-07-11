@@ -39,7 +39,8 @@ def set_options(opt):
 def configure(conf):
   conf.check_tool('compiler_cxx')
   conf.check_tool('compiler_cc') 
-
+  
+  conf.env.append_value("LIB_EXPAT", "expat");
   conf.check_cfg(package='dbus-1', args='--cflags --libs', uselib_store='DBUS');
   conf.check_cfg(package='dbus-glib-1', args='--cflags --libs', uselib_store='GDBUS');
   
@@ -90,9 +91,10 @@ def build_dbus(bld):
   obj.target = 'dbus';
   obj.source = '''
     v8-dbus/trunk/src/dbus_library.cc
+    v8-dbus/trunk/src/dbus_introspect.cc
     v8-dbus/trunk/src/dbus_main.cc
     '''
-  obj.uselib = 'DBUS GDBUS V8'
+  obj.uselib = 'DBUS GDBUS EXPAT V8'
   obj.includes = 'v8/include'
 
 def v8_cmd(bld, variant):

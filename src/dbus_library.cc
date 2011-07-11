@@ -77,12 +77,15 @@ v8::Handle<v8::Value> DBusExtension::SessionBus(const v8::Arguments& args) {
   }
 
   DBusGConnection *connection = GetBusFromType(DBUS_BUS_SESSION);
-  if (connection == NULL)
+  if (connection == NULL)  {
+    std::cerr<<"Error get session bus\n";
     return v8::Undefined();
+  }
 
   v8::Local<v8::Object> conn_object = g_conn_template_->NewInstance();
   conn_object->SetInternalField(0, v8::External::New(connection));
-
+  
+  std::cout<<"return connection object\n";
   return scope.Close(conn_object); 
 }
 
@@ -119,7 +122,7 @@ v8::Handle<v8::Value> DBusExtension::GetInterface(const v8::Arguments& args) {
   v8::String::Utf8Value interface_name(args[3]->ToString());
 
   DBusGConnection *connection = (DBusGConnection*) v8::External::Unwrap(
-                                     bus_object->GetInternalField(1));
+                                     bus_object->GetInternalField(0));
   //Start DBus Proxy call
   GError *error;
   DBusGProxy *proxy;
@@ -145,6 +148,7 @@ v8::Handle<v8::Value> DBusExtension::GetInterface(const v8::Arguments& args) {
      return v8::Undefined();
   }
   
+  std::cout<<iface_data<<std::endl;
   v8::Local<v8::String> iface_string = v8::String::New(iface_data);
   g_free(iface_data);
 

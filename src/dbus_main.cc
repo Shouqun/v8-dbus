@@ -49,6 +49,7 @@ int main(int argc, char **argv)
 
   //load the test script file
   string test_file;
+  test_file = "main.js";
   v8::Handle<v8::String> test = ReadFile(test_file);
   v8::Local<v8::Script> test_func = v8::Script::Compile(test);
   v8::Local<v8::Value> test_ret = test_func->Run();

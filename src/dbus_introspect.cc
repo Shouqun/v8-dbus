@@ -8,32 +8,9 @@
 
 #include "dbus_introspect.h"
 
-static char*  ReadFile(const char* name, int *len) {
-  FILE *file = fopen(name, "rb");
-  if (file == NULL) {
-    fprintf(stderr, "Error open file: %s: %d", name, errno);
-    return NULL;
-  }
-
-  fseek(file, 0, SEEK_END);
-  int size = ftell(file);
-  rewind(file);
-
-  char *chars = new char[size+1];
-  chars[size] = '\0';
-
-  for(int i=0; i<size;) {
-    int read = fread(&chars[i], 1, size-i, file);
-    i+=read;
-  }
-
-  fclose(file);
-
-  *len = size;
-  return chars;
-}
 
 
+namespace dbus_library {
 
 Parser* ParserNew() {
   Parser *parser = new Parser;
@@ -66,7 +43,7 @@ void ParserPrint(Parser *parser) {
           method_ite != interface->methods_.end();
           method_ite++) {
       BusMethod *method = *method_ite;
-      printf("    method:%s\n", method->name_.c_str());
+      printf("    method:%s , %s\n", method->name_.c_str(), method->signature_.c_str());
 
       std::list<BusArgument*>::iterator argument_ite;
       for(argument_ite = method->args_.begin();
@@ -196,16 +173,18 @@ static void expat_StartElementHandler(void *userData,
     BusArgument *argument = new BusArgument;
     parser->is_on_argument = true;
     parser->current_argument = argument;
-    
+
+    argument->type_ = GetAttribute(attrs, "type");
+    argument->direction_ = GetAttribute(attrs, "direction");
+
     if (parser->is_on_method) {
       parser->current_method->args_.push_back(argument);
+      if (argument->direction_ == "in")
+        parser->current_method->signature_ += argument->type_;
     } else if (parser->is_on_signal) {
       parser->current_signal->args_.push_back(argument);
     }
     
-   argument->type_ = GetAttribute(attrs, "type");
-   argument->direction_ = GetAttribute(attrs, "direction");
-
   } else {
     fprintf(stderr, "Error NodeType\n");
   }
@@ -235,7 +214,7 @@ static void expat_EndElementHandler(void *userData,
   }
 }
 
-Parser* ParseIntrospcect(char *source, int size) {
+Parser* ParseIntrospcect(const char *source, int size) {
   XML_Parser expat;
   int userdata;
   Parser *parser = ParserNew();
@@ -263,10 +242,58 @@ Parser* ParseIntrospcect(char *source, int size) {
       return NULL;
   }
   
+  ParserPrint(parser);
   return parser;
 }
 
+BusInterface* ParserGetInterface(Parser *parser, const char *iface) {
+  if (parser == NULL) {
+    return NULL;
+  }
+
+  BusNode *root_node = parser->root_node;
+
+  std::list<BusInterface*>::iterator iface_ite;
+  for( iface_ite = root_node->interfaces_.begin(); 
+        iface_ite != root_node->interfaces_.end();
+        iface_ite++) {
+    BusInterface *interface = *iface_ite;
+    if (interface->name_ == iface)
+      return interface;
+  }
+
+  return NULL;
+}
+
+} //end of namespace
+
 #ifdef __TEST
+
+static char*  ReadFile(const char* name, int *len) {
+  FILE *file = fopen(name, "rb");
+  if (file == NULL) {
+    fprintf(stderr, "Error open file: %s: %d", name, errno);
+    return NULL;
+  }
+
+  fseek(file, 0, SEEK_END);
+  int size = ftell(file);
+  rewind(file);
+
+  char *chars = new char[size+1];
+  chars[size] = '\0';
+
+  for(int i=0; i<size;) {
+    int read = fread(&chars[i], 1, size-i, file);
+    i+=read;
+  }
+
+  fclose(file);
+
+  *len = size;
+  return chars;
+}
+
 int main(int argc, char **argv)
 {
   int size;

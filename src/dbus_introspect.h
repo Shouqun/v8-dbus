@@ -4,6 +4,8 @@
 #include <list>
 #include <string>
 
+namespace dbus_library {
+
 struct BusArgument {
   std::string type_;
   std::string direction_;
@@ -11,6 +13,7 @@ struct BusArgument {
 
 struct BusMethod {
   std::string name_;
+  std::string signature_;
   std::list<BusArgument*> args_;
 };
 
@@ -48,7 +51,11 @@ Parser* ParserNew();
 void ParserPrint(Parser *parser);
 void ParserRelease(Parser **pparer);
 
-Parser* ParseIntrospcect(char *source, int size);
+Parser* ParseIntrospcect(const char *source, int size);
+
+BusInterface* ParserGetInterface(Parser *parser, const char *iface);
+
+}
 
 #endif
 

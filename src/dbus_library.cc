@@ -3,6 +3,9 @@
 #include <dbus/dbus-glib.h>
 #include <dbus/dbus-glib-lowlevel.h>
 
+#include <list>
+#include <string>
+#include <map>
 #include <iostream>
 
 #include "dbus_library.h"
@@ -53,6 +56,7 @@ public:
 
 //static object
 v8::Persistent<v8::ObjectTemplate> DBusExtension::g_conn_template_;
+static bool g_is_signal_filter_attached_ = false;
 
 DBusExtension::DBusExtension() {
   //the consctruction call
@@ -78,7 +82,110 @@ static v8::Handle<v8::Value> GetMethod(v8::Local<v8::Object>& iface,
                                          const char *interface_name,
                                          BusMethod *method);
 
+static v8::Handle<v8::Value> GetSignal(v8::Local<v8::Object>& iface,
+                                         DBusGConnection *connection,
+                                         const char *service_name,
+                                         const char *object_path,
+                                         const char *interface_name,
+                                         BusSignal *signal);
+                                         
+                                         
+//the signal map stores v8 Persistent object by the signal string
+typedef std::map<std::string, v8::Handle<v8::Object> > SignalMap;
+SignalMap g_signal_object_map;
 
+std::string GetSignalMatchRule(DBusSignalContainer *container) {
+  std::string result;
+  
+  result = container->interface + "." + container->signal;
+  
+  //std::cout<<"GetSignalMatchRule:"<<result;
+  return result;
+}
+
+std::string GetSignalMatchRuleByString(std::string interface,
+                                       std::string signal) {
+  std::string result;
+  
+  result = interface + "." + signal;
+  
+  //std::cout<<"GetSignalMatchRuleByString:"<<result;
+  return result;
+}
+
+v8::Handle<v8::Value> GetSignalObject(DBusSignalContainer *signal) {
+  std::string match_rule = GetSignalMatchRule(signal);
+ 
+  SignalMap::iterator ite = g_signal_object_map.find(match_rule);
+  if (ite == g_signal_object_map.end() ) {
+    return v8::Undefined();
+  }
+   
+  return ite->second;
+}
+
+v8::Handle<v8::Value> GetSignalObjectByString(std::string match_rule) {
+  //std::cout<<"GetSignalObjectByString:"<<match_rule; 
+  SignalMap::iterator ite = g_signal_object_map.find(match_rule);
+  if (ite == g_signal_object_map.end() ) {
+    return v8::Undefined();
+  }
+  
+  //std::cout<<"Find the match"; 
+  return ite->second;
+}
+
+void AddSignalObject(DBusSignalContainer *signal,
+                           v8::Handle<v8::Object> signal_obj) {
+  std::string match_rule = GetSignalMatchRule(signal);
+  
+  SignalMap::iterator ite = g_signal_object_map.find(match_rule);
+  if (ite == g_signal_object_map.end() ) {
+    std::cout<<"We are to add the signal object";
+    g_signal_object_map.insert( make_pair(match_rule,
+          signal_obj));
+  }
+}
+
+void RemoveSignalObject(DBusSignalContainer *signal) {
+  std::string match_rule = GetSignalMatchRule(signal);
+  // remove the matching item from signal object map
+  std::cout<<"We are going to remove the object map item";
+  g_signal_object_map.erase(match_rule);
+}
+
+
+/// dbus_signal_weak_callback: MakeWeak callback for signal Persistent
+///    object,
+static void dbus_signal_weak_callback(v8::Persistent<v8::Value> value, 
+                                      void* parameter) {
+  std::cout<<"dbus_signal_weak_callback";
+
+  DBusSignalContainer *container = (DBusSignalContainer*) parameter;
+  std::cout<<"Get the container obejct:" ;//<< (int) container;
+  if (container != NULL) {
+    //Remove the matching objet map item from the map
+    RemoveSignalObject(container); 
+    delete container;
+  }
+
+  value.Dispose();
+  value.Clear();
+}                                       
+
+/// dbus_method_weak_callback: MakeWeak callback for method Persistent
+///   obect
+static void dbus_method_weak_callback(v8::Persistent<v8::Value> value,
+                                      void* parameter) {
+  std::cout<<"dbus_method_weak_callback";
+  DBusMethodContainer *container = (DBusMethodContainer*) parameter;
+  std::cout<<"Get the container object:"; //<< (int) container;
+  if (container != NULL)
+    delete container;
+
+  value.Dispose();
+  value.Clear();
+}
 
 v8::Handle<v8::Value> DBusExtension::Initialize(
                         v8::Handle<v8::Object>& target) {
@@ -95,11 +202,14 @@ v8::Handle<v8::Value> DBusExtension::Initialize(
           = v8::FunctionTemplate::New(DBusExtension::GetInterface);
   v8::Local<v8::FunctionTemplate> get_method_t
           = v8::FunctionTemplate::New(DBusExtension::GetMethod);
+  v8::Local<v8::FunctionTemplate> main_loop_t
+          = v8::FunctionTemplate::New(DBusExtension::MainLoop);
 
   target->Set(v8::String::New("SessionBus"), session_bus_t->GetFunction());
   target->Set(v8::String::New("SystemBus"), system_bus_t->GetFunction());
   target->Set(v8::String::New("GetInterface"), get_interface_t->GetFunction());
   target->Set(v8::String::New("GetMethod"), get_method_t->GetFunction());
+  target->Set(v8::String::New("MainLoop"), main_loop_t->GetFunction());
   target->Set(v8::String::New("Log"), v8::FunctionTemplate::New(LogCallback)->GetFunction());
 }
 
@@ -146,6 +256,24 @@ v8::Handle<v8::Value> DBusExtension::SystemBus(const v8::Arguments& args) {
   conn_object->SetInternalField(0, v8::External::New(connection));
 
   return scope.Close(conn_object); 
+}
+
+// /To receive signal, need to start message loop and dispatch signals
+v8::Handle<v8::Value> DBusExtension::MainLoop(const v8::Arguments& args) {
+  v8::HandleScope scope;
+  
+  v8::Local<v8::Object> bus_object = args[0]->ToObject();
+  DBusGConnection *connection = (DBusGConnection*) v8::External::Unwrap(
+                                      bus_object->GetInternalField(0));
+
+  std::cout<<"Get the conneciont object and start message loop\n";
+  
+  while (true) {
+    dbus_connection_read_write_dispatch(
+          dbus_g_connection_get_connection(connection), -1);
+  }
+
+  return v8::Undefined();
 }
 
 v8::Handle<v8::Value> DBusExtension::GetInterface(const v8::Arguments& args) {
@@ -216,6 +344,16 @@ v8::Handle<v8::Value> DBusExtension::GetInterface(const v8::Arguments& args) {
                *interface_name, method);
   }
 
+  //get all interface
+  std::list<BusSignal*>::iterator signal_ite;
+  for( signal_ite = interface->signals_.begin();
+         signal_ite != interface->signals_.end();
+         signal_ite++ ) {
+    BusSignal *signal = *signal_ite;
+    //get siangl object
+    dbus_library::GetSignal(interface_object, connection, *service_name,
+              *object_path, *interface_name, signal);
+  }
 
   ParserRelease(&parser);
 
@@ -767,6 +905,144 @@ v8::Handle<v8::Value> DBusMethod(const v8::Arguments& args){
     return return_value;
 }
 
+
+/// dbus_signal_filter: the static message filter of dbus messages
+///   this filter receives all dbus signal messages and then find the 
+///   corressponding signal handler from the global hash map, and 
+///   then call the signal handler callback with the arguments from the
+///   dbus message 
+static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
+                                            DBusMessage* message,
+                                            void *user_data) {
+  std::cout<<"SIGNAL FILTER";
+  if (message == NULL || 
+        dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL) {
+    std::cout<<"Not a valid signal";
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  }
+  //get the interface name and signal name
+  const char *interface_str = dbus_message_get_interface(message);
+  const char *signal_name_str = dbus_message_get_member(message);
+  if (interface_str == NULL || signal_name_str == NULL ) {
+    std::cout<<"Not valid signal parameter";
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  }  
+
+  std::string interface = dbus_message_get_interface(message);
+  std::string signal_name = dbus_message_get_member(message);
+
+  //std::cout<<"Interface"<<interface<<"  "<<signal_name;
+  //get the signal matching rule
+  std::string match = GetSignalMatchRuleByString(interface, signal_name);
+ 
+  //get the signal handler object
+  v8::Handle<v8::Value> value = GetSignalObjectByString(match);
+  if (value == v8::Undefined()) {
+    //std::cout<<"No Matching Rule";
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  } 
+
+  //create the execution context since its in new context
+  v8::Handle<v8::Context> context = v8::Context::New();
+  v8::Context::Scope ctxScope(context); 
+  v8::HandleScope scope;
+  v8::TryCatch try_catch;
+
+  //get the enabled property and the onemit callback
+  v8::Handle<v8::Object> object = value->ToObject();
+  v8::Local<v8::Value> callback_enabled 
+                          = object->Get(v8::String::New("enabled"));
+  v8::Local<v8::Value> callback_v 
+                          = object->Get(v8::String::New("onemit"));
+
+  
+  if ( callback_enabled == v8::Undefined() 
+                      || callback_v == v8::Undefined()) {
+    std::cout<<"Callback undefined";
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  }
+  if (! callback_enabled->ToBoolean()->Value()) {
+    std::cout<<"Callback not enabled";
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  }
+  if (! callback_v->IsFunction()) {
+    std::cout<<"The callback is not a Function";
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  }
+
+  v8::Local<v8::Function> callback 
+                          = v8::Local<v8::Function>::Cast(callback_v);
+
+  //Decode reply message as argument
+  v8::Handle<v8::Value> args[1];
+  v8::Handle<v8::Value> arg0 = decode_reply_messages(message);
+  args[0] = arg0; 
+
+  //Do call the callback
+  std::cout<<"To call the callback";
+  callback->Call(callback, 1, args);
+
+  if (try_catch.HasCaught()) {
+    std::cout<<"Ooops, Exception on call the callback";
+  } 
+
+  return DBUS_HANDLER_RESULT_HANDLED;
+}
+
+
+v8::Handle<v8::Value> GetSignal(v8::Local<v8::Object>& interface_object,
+                                         DBusGConnection *connection,
+                                         const char *service_name,
+                                         const char *object_path,
+                                         const char *interface_name,
+                                         BusSignal *signal) {
+  v8::HandleScope scope;
+
+  if (!g_is_signal_filter_attached_ ) {
+    std::cout<<"attach signal filter\n";
+    dbus_connection_add_filter(dbus_g_connection_get_connection(connection),
+                             dbus_signal_filter, NULL, NULL);
+    g_is_signal_filter_attached_ = true;
+  }
+
+  DBusError error;
+  dbus_error_init (&error); 
+  dbus_bus_add_match ( dbus_g_connection_get_connection(connection),
+          "type='signal'",
+          &error);
+  if (dbus_error_is_set (&error)) {
+    std::cout<<"Error Add match:"<<error.message;
+  }
+
+  //create the object
+  v8::Local<v8::ObjectTemplate> signal_obj_temp = v8::ObjectTemplate::New();
+  signal_obj_temp->SetInternalFieldCount(1);
+  
+  v8::Persistent<v8::Object> signal_obj 
+      = v8::Persistent<v8::Object>::New(signal_obj_temp->NewInstance());
+  signal_obj->Set(v8::String::New("onemit"), v8::Undefined());
+  signal_obj->Set(v8::String::New("enabled"), v8::Boolean::New(false));
+   
+  DBusSignalContainer *container = new DBusSignalContainer;
+  container->service= service_name;
+  container->path = object_path;
+  container->interface = interface_name;
+  container->signal = signal->name_; 
+
+  AddSignalObject(container, signal_obj); 
+  signal_obj->SetInternalField(0, v8::External::New(container));
+  std::cout<<"Set the container object"; //<<(int)container; 
+  //make the signal handle weak and set the callback
+  signal_obj.MakeWeak(container, dbus_signal_weak_callback);
+
+
+  interface_object->Set(v8::String::New(signal->name_.c_str()),
+                          signal_obj);
+
+  return v8::Undefined();
+}
+
+
 v8::Handle<v8::Value> GetMethod(
                           v8::Local<v8::Object>& interface_object,
                           DBusGConnection *connection,
@@ -791,6 +1067,8 @@ v8::Handle<v8::Value> GetMethod(
                                     v8::External::New((void*)container));  
   v8::Local<v8::Function> func_obj = func_template->GetFunction();
   v8::Persistent<v8::Function> p_func_obj = v8::Persistent<v8::Function>::New(func_obj);
+ 
+  p_func_obj.MakeWeak(container, dbus_method_weak_callback);
 
   interface_object->Set(v8::String::New(container->method.c_str()), 
                         p_func_obj);

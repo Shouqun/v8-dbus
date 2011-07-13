@@ -27,6 +27,8 @@ public:
 
   static v8::Handle<v8::Value> GetSignal(const v8::Arguments& args);
 
+  static v8::Handle<v8::Value> MainLoop(const v8::Arguments& args);
+
 public:
   static v8::Persistent<v8::ObjectTemplate> g_conn_template_;
 };

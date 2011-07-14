@@ -25,12 +25,11 @@ static DBusGConnection* GetBusFromType(DBusBusType type) {
   connection = dbus_g_bus_get(type, &error);
   if (connection == NULL)
   {
-    std::cerr<<"Failed to open connection to bus: "<<error->message;
+    std::cerr<<"Failed to open connection to bus: "<<error->message<<"\n";
     g_error_free (error);
     return connection;
   }
 
-  //std::cout<<"Connection:"<<reinterpret_cast<int>(connection);
   return connection;
 }
 
@@ -210,7 +209,8 @@ v8::Handle<v8::Value> DBusExtension::Initialize(
   target->Set(v8::String::New("GetInterface"), get_interface_t->GetFunction());
   target->Set(v8::String::New("GetMethod"), get_method_t->GetFunction());
   target->Set(v8::String::New("MainLoop"), main_loop_t->GetFunction());
-  target->Set(v8::String::New("Log"), v8::FunctionTemplate::New(LogCallback)->GetFunction());
+  target->Set(v8::String::New("Log"), 
+                  v8::FunctionTemplate::New(LogCallback)->GetFunction());
 }
 
 v8::Handle<v8::Value> DBusExtension::New(const v8::Arguments& args) {
@@ -331,6 +331,10 @@ v8::Handle<v8::Value> DBusExtension::GetInterface(const v8::Arguments& args) {
 
   //get the dest inteface obejct
   BusInterface *interface = ParserGetInterface(parser, *interface_name);
+  if (interface == NULL) {
+    std::cerr<<"Error, No such interface\n";
+    return v8::Undefined();
+  }
   //create the Interface object to return
   v8::Local<v8::Object> interface_object = v8::Object::New();
   interface_object->Set(v8::String::New("xml_source"), v8::String::New(iface_data));
@@ -411,7 +415,7 @@ static v8::Handle<v8::Value> decode_reply_message_by_iter(
     case DBUS_TYPE_BOOLEAN: {
       dbus_bool_t value = false;
       dbus_message_iter_get_basic(iter, &value);
-      std::cout<<"DBUS_TYPE_BOOLEAN: "<<value;
+      std::cout<<"DBUS_TYPE_BOOLEAN: "<<value<<std::endl;
       return v8::Boolean::New(value);
       break;
     }
@@ -424,14 +428,14 @@ static v8::Handle<v8::Value> decode_reply_message_by_iter(
     case DBUS_TYPE_UINT64: {
       dbus_uint64_t value = 0; 
       dbus_message_iter_get_basic(iter, &value);
-      std::cout<<"DBUS_TYPE_NUMERIC: "<< value;
+      std::cout<<"DBUS_TYPE_NUMERIC: "<< value<<std::endl;
       return v8::Integer::New(value);
       break;
     }
     case DBUS_TYPE_DOUBLE: {
       double value = 0;
       dbus_message_iter_get_basic(iter, &value);
-      std::cout<<"DBUS_TYPE_DOUBLE: "<< value;
+      std::cout<<"DBUS_TYPE_DOUBLE: "<< value<<std::endl;
       return v8::Number::New(value);
       break;
     }
@@ -440,13 +444,13 @@ static v8::Handle<v8::Value> decode_reply_message_by_iter(
     case DBUS_TYPE_STRING: {
       const char *value;
       dbus_message_iter_get_basic(iter, &value); 
-      std::cout<<"DBUG_TYPE_STRING: "<<value;
+      std::cout<<"DBUG_TYPE_STRING: "<<value<<std::endl;
       return v8::String::New(value);
       break;
     }
     case DBUS_TYPE_ARRAY:
     case DBUS_TYPE_STRUCT: {
-      std::cout<<"DBUS_TYPE_ARRAY";
+      std::cout<<"DBUS_TYPE_ARRAY\n";
       DBusMessageIter internal_iter, internal_temp_iter;
       int count = 0;         
      
@@ -460,12 +464,12 @@ static v8::Handle<v8::Value> decode_reply_message_by_iter(
       dbus_message_iter_recurse(iter, &internal_iter);
 
       do {
-        std::cout<<"for each item";
+        std::cout<<"for each item\n";
         //this is dict entry
         if (dbus_message_iter_get_arg_type(&internal_iter) 
                       == DBUS_TYPE_DICT_ENTRY) {
           //Item is dict entry, it is exactly key-value pair
-          std::cout<<"  DBUS_TYPE_DICT_ENTRY";
+          std::cout<<"  DBUS_TYPE_DICT_ENTRY\n";
           DBusMessageIter dict_entry_iter;
           //The key 
           dbus_message_iter_recurse(&internal_iter, &dict_entry_iter);
@@ -490,7 +494,7 @@ static v8::Handle<v8::Value> decode_reply_message_by_iter(
       return resultArray;
     }
     case DBUS_TYPE_VARIANT: {
-      std::cout<<"DBUS_TYPE_VARIANT";
+      std::cout<<"DBUS_TYPE_VARIANT\n";
       DBusMessageIter internal_iter;
       dbus_message_iter_recurse(iter, &internal_iter);
       
@@ -499,10 +503,10 @@ static v8::Handle<v8::Value> decode_reply_message_by_iter(
       return result;
     }
     case DBUS_TYPE_DICT_ENTRY: {
-      std::cout<<"DBUS_TYPE_DICT_ENTRY"<< ":should Never be here.";
+      std::cout<<"DBUS_TYPE_DICT_ENTRY"<< ":should Never be here.\n";
     }
     case DBUS_TYPE_INVALID: {
-      std::cout<<"DBUS_TYPE_INVALID";
+      std::cout<<"DBUS_TYPE_INVALID\n";
     } 
     default: {
       //should return 'undefined' object
@@ -528,23 +532,23 @@ static v8::Handle<v8::Value> decode_reply_messages(DBusMessage *message) {
     return v8::Undefined();
   }     
 
-  std::cout<<"Return Message Count: "<<count;
+  std::cout<<"Return Message Count: "<<count<<std::endl;
   v8::Local<v8::Array> resultArray = v8::Array::New(count);
-  std::cout<<"dbus_message_iter_init "<<count;
+  std::cout<<"dbus_message_iter_init "<<count<<std::endl;
   dbus_message_iter_init(message, &iter);
-  std::cout<<"dbus_message_get_type "<<count;
+  std::cout<<"dbus_message_get_type "<<count<<std::endl;
 
   //handle error
   if (dbus_message_get_type(message) == DBUS_MESSAGE_TYPE_ERROR) {
     const char *error_name = dbus_message_get_error_name(message);
     if (error_name != NULL) {
-      std::cerr<<"Error message: "<<error_name;
+      std::cerr<<"Error message: "<<error_name<<std::endl;
     }
   }
 
-  std::cout<<"dbus_message_get_type "<<count; 
+  std::cout<<"dbus_message_get_type "<<count<<std::endl; 
   while ((type=dbus_message_iter_get_arg_type(&iter)) != DBUS_TYPE_INVALID) {
-    std::cerr<<"Decode message";
+    std::cerr<<"Decode message"<<std::endl;
     v8::Handle<v8::Value> valueItem = decode_reply_message_by_iter(&iter);
     resultArray->Set(argument_count, valueItem);
 
@@ -591,7 +595,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
     case DBUS_TYPE_BOOLEAN:  {
       dbus_bool_t data = value->BooleanValue();  
       if (!dbus_message_iter_append_basic(iter, DBUS_TYPE_BOOLEAN, &data)) {
-        std::cerr<<"Error append boolean";
+        std::cerr<<"Error append boolean\n";
         return false;
       }
       break;
@@ -606,7 +610,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
     case DBUS_TYPE_BYTE: {
       dbus_uint64_t data = value->IntegerValue();
       if (!dbus_message_iter_append_basic(iter, type, &data)) {
-        std::cerr<<"Error append numeric";
+        std::cerr<<"Error append numeric\n";
         return false;
       }
       break; 
@@ -617,7 +621,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
       v8::String::Utf8Value data_val(value->ToString());
       char *data = *data_val;
       if (!dbus_message_iter_append_basic(iter, type, &data)) {
-        std::cerr<<"Error append string";
+        std::cerr<<"Error append string\n";
         return false;
       }
       break;
@@ -625,7 +629,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
     case DBUS_TYPE_DOUBLE: {
       double data = value->NumberValue();
       if (!dbus_message_iter_append_basic(iter, type, &data)) {
-        std::cerr<<"Error append double";
+        std::cerr<<"Error append double\n";
         return false;
       }
       break;
@@ -636,7 +640,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
                                     == DBUS_TYPE_DICT_ENTRY) {
         //This element is a DICT type of D-Bus
         if (! value->IsObject()) {
-          std::cerr<<"Error, not a Object type for DICT_ENTRY";
+          std::cerr<<"Error, not a Object type for DICT_ENTRY\n";
           return false;
         }
         v8::Local<v8::Object> value_object = value->ToObject();
@@ -649,7 +653,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
 
         if (!dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY,
                                 dict_sig, &subIter)) {
-          std::cerr<<"Can't open container for ARRAY-Dict type";
+          std::cerr<<"Can't open container for ARRAY-Dict type\n";
           dbus_free(dict_sig); 
           return false; 
         }
@@ -669,7 +673,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
           if (!dbus_message_iter_open_container(&subIter, 
                                 DBUS_TYPE_DICT_ENTRY,
                                 NULL, &dict_iter)) {
-            std::cerr<<"  Can't open container for DICT-ENTTY";
+            std::cerr<<"  Can't open container for DICT-ENTTY\n";
             return false;
           }
 
@@ -711,11 +715,11 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
       
         dbus_signature_iter_recurse(&siter, &arraySIter);
         array_sig = dbus_signature_iter_get_signature(&arraySIter);
-        std::cout<<"Array Signature: "<<array_sig; 
+        std::cout<<"Array Signature: "<<array_sig<<"\n"; 
       
         if (!dbus_message_iter_open_container(iter, DBUS_TYPE_ARRAY, 
                                               array_sig, &subIter)) {
-          std::cerr<<"Can't open container for ARRAY type";
+          std::cerr<<"Can't open container for ARRAY type\n";
           g_free(array_sig); 
           return false; 
         }
@@ -723,7 +727,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
         v8::Local<v8::Array> arrayData = v8::Local<v8::Array>::Cast(value);
         bool no_error_status = true;
         for (unsigned int i=0; i < arrayData->Length(); i++) {
-          std::cerr<<"  Argument Arrary Item:"<<i;
+          std::cerr<<"  Argument Arrary Item:"<<i<<"\n";
           v8::Local<v8::Value> arrayItem = arrayData->Get(i);
           if ( encode_to_message_with_objects(arrayItem, 
                                           &subIter, array_sig) ) {
@@ -738,19 +742,19 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
       break;
     }
     case DBUS_TYPE_VARIANT: {
-      std::cout<<"DBUS_TYPE_VARIANT";
+      std::cout<<"DBUS_TYPE_VARIANT\n";
       DBusMessageIter sub_iter;
       DBusSignatureIter var_siter;
        //FIXME: the variable stub
       char *var_sig = get_signature_from_v8_type(value);
       
-      std::cout<<" Guess the variable type is: "<<var_sig;
+      std::cout<<" Guess the variable type is: "<<var_sig<<"\n";
 
       dbus_signature_iter_recurse(&siter, &var_siter);
       
       if (!dbus_message_iter_open_container(iter, DBUS_TYPE_VARIANT, 
                               var_sig, &sub_iter)) {
-        std::cout<<"Can't open contianer for VARIANT type";
+        std::cout<<"Can't open contianer for VARIANT type\n";
         return false;
       }
       
@@ -770,7 +774,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
 
       if (!dbus_message_iter_open_container(iter, DBUS_TYPE_STRUCT, 
                               NULL, &sub_iter)) {
-        std::cerr<<"Can't open contianer for STRUCT type";
+        std::cerr<<"Can't open contianer for STRUCT type\n";
         return false;
       }
       
@@ -800,7 +804,7 @@ static bool encode_to_message_with_objects(v8::Local<v8::Value> value,
       return no_error_status;
     }
     default: {
-      std::cerr<<"Error! Try to append Unsupported type";
+      std::cerr<<"Error! Try to append Unsupported type\n";
       return false;
     }
   }
@@ -837,7 +841,7 @@ v8::Handle<v8::Value> DBusMethod(const v8::Arguments& args){
 
     dbus_error_init(&error);        
     if (!dbus_signature_validate(signature, &error)) {
-      std::cerr<<"Invalid signature "<<error.message;
+      std::cerr<<"Invalid signature "<<error.message<<"\n";
     }
     
     dbus_signature_iter_init(&siter, signature);
@@ -846,7 +850,7 @@ v8::Handle<v8::Value> DBusMethod(const v8::Arguments& args){
       std::cout<<"ARG: "<<arg_sig<<" Length:"<<args.Length() <<" Count:"<<count;
       //process the argument sig
       if (count >= args.Length()) {
-        std::cerr<<"Arguments Not Enough";
+        std::cerr<<"Arguments Not Enough\n";
         break;
       }
       
@@ -861,50 +865,50 @@ v8::Handle<v8::Value> DBusMethod(const v8::Arguments& args){
     } while (dbus_signature_iter_next(&siter));
   }
   
-    //check if there is error on encode dbus message
-    if (!no_error_status) {
-      if (message != NULL)
-        dbus_message_unref(message);
-      return v8::Undefined();
-    }
-
-    //call the dbus method and get the returned message, and decode to 
-    //target v8 object
-    DBusMessage *reply_message;
-    DBusError error;    
-    v8::Handle<v8::Value> return_value = v8::Undefined();
-
-    dbus_error_init(&error); 
-    //send message and call sync dbus_method
-    reply_message = dbus_connection_send_with_reply_and_block(
-            dbus_g_connection_get_connection(container->connection),
-            message, -1, &error);
-    if (reply_message != NULL) {
-      if (dbus_message_get_type(reply_message) == DBUS_MESSAGE_TYPE_ERROR) {
-        std::cerr<<"Error reply message";
-
-      } else if (dbus_message_get_type(reply_message) 
-                    == DBUS_MESSAGE_TYPE_METHOD_RETURN) {
-        std::cerr<<"Reply Message OK!";
-        //method call return ok, decoe the messge to v8 Value 
-        return_value = decode_reply_messages(reply_message);
-
-      } else {
-        std::cerr<<"Unkonwn reply";
-      }
-      //free the reply message of dbus call
-      dbus_message_unref(reply_message);
-    } else {
-        std::cerr<<"Error calling sync method:"<<error.message;
-        dbus_error_free(&error);
-    }
-   
-    //free the input dbus message if needed
-    if (message != NULL) {
+  //check if there is error on encode dbus message
+  if (!no_error_status) {
+    if (message != NULL)
       dbus_message_unref(message);
-    } 
+    return v8::Undefined();
+  }
 
-    return return_value;
+  //call the dbus method and get the returned message, and decode to 
+  //target v8 object
+  DBusMessage *reply_message;
+  DBusError error;    
+  v8::Handle<v8::Value> return_value = v8::Undefined();
+
+  dbus_error_init(&error); 
+  //send message and call sync dbus_method
+  reply_message = dbus_connection_send_with_reply_and_block(
+          dbus_g_connection_get_connection(container->connection),
+          message, -1, &error);
+  if (reply_message != NULL) {
+    if (dbus_message_get_type(reply_message) == DBUS_MESSAGE_TYPE_ERROR) {
+      std::cerr<<"Error reply message\n";
+
+    } else if (dbus_message_get_type(reply_message) 
+                  == DBUS_MESSAGE_TYPE_METHOD_RETURN) {
+      std::cerr<<"Reply Message OK!\n";
+      //method call return ok, decoe the messge to v8 Value 
+      return_value = decode_reply_messages(reply_message);
+
+    } else {
+      std::cerr<<"Unkonwn reply\n";
+    }
+    //free the reply message of dbus call
+    dbus_message_unref(reply_message);
+  } else {
+      std::cerr<<"Error calling sync method:"<<error.message<<"\n";
+      dbus_error_free(&error);
+  }
+ 
+  //free the input dbus message if needed
+  if (message != NULL) {
+    dbus_message_unref(message);
+  } 
+
+  return return_value;
 }
 
 
@@ -960,15 +964,15 @@ static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
   
   if ( callback_enabled == v8::Undefined() 
                       || callback_v == v8::Undefined()) {
-    std::cout<<"Callback undefined";
+    std::cout<<"Callback undefined\n";
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
   if (! callback_enabled->ToBoolean()->Value()) {
-    std::cout<<"Callback not enabled";
+    std::cout<<"Callback not enabled\n";
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
   if (! callback_v->IsFunction()) {
-    std::cout<<"The callback is not a Function";
+    std::cout<<"The callback is not a Function\n";
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
 
@@ -1013,7 +1017,7 @@ v8::Handle<v8::Value> GetSignal(v8::Local<v8::Object>& interface_object,
           "type='signal'",
           &error);
   if (dbus_error_is_set (&error)) {
-    std::cout<<"Error Add match:"<<error.message;
+    std::cout<<"Error Add match:"<<error.message<<"\n";
   }
 
   //create the object
@@ -1033,7 +1037,7 @@ v8::Handle<v8::Value> GetSignal(v8::Local<v8::Object>& interface_object,
 
   AddSignalObject(container, signal_obj); 
   signal_obj->SetInternalField(0, v8::External::New(container));
-  std::cout<<"Set the container object"; //<<(int)container; 
+  std::cout<<"Set the container object\n"; 
   //make the signal handle weak and set the callback
   signal_obj.MakeWeak(container, dbus_signal_weak_callback);
 
@@ -1069,7 +1073,8 @@ v8::Handle<v8::Value> GetMethod(
                                     v8::External::New((void*)container));  
   v8::Local<v8::Function> func_obj = func_template->GetFunction();
   v8::Persistent<v8::Function> p_func_obj = v8::Persistent<v8::Function>::New(func_obj);
- 
+  
+  //MakeWeak for GC
   p_func_obj.MakeWeak(container, dbus_method_weak_callback);
 
   interface_object->Set(v8::String::New(container->method.c_str()), 

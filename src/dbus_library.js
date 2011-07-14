@@ -29,10 +29,6 @@ if (typeof(dbuslib) == 'undefined') {
 
 (function(){
 
-    dbuslib.session_bus = 1;
-    dbuslib.system_bus = 2;
-
-
     dbuslib.session_bus  = function() {
         return SessionBus();
     }    
@@ -45,16 +41,13 @@ if (typeof(dbuslib) == 'undefined') {
         return MainLoop(bus);
     }
     
-    /*
     dbuslib.dispose_interface = function(iface) {
         
         for (var prop in iface)
         {
-            Dispose(iface[prop]);
             iface[prop] = undefined;
         }
     }
-    */
 
     dbuslib.get_interface = function(bus, bus_name, object_path, interface_name) {
        
@@ -62,7 +55,6 @@ if (typeof(dbuslib) == 'undefined') {
       
         return iface;
     }
-
        
 }) ();
 

@@ -14,6 +14,7 @@ namespace dbus_library {
 
 Parser* ParserNew() {
   Parser *parser = new Parser;
+  parser->root_node = NULL;
   parser->current_node = NULL;
   parser->is_on_node = false;
   parser->current_interface = NULL;
@@ -140,6 +141,10 @@ static void expat_StartElementHandler(void *userData,
   Parser *parser = reinterpret_cast<Parser*>(userData);
 
   if (!strcmp(name, "node")) {
+    //the node object is not the first node or root node,then skip
+    if (parser->root_node != NULL) {
+      return;
+    }
     BusNode *node = new BusNode;
     parser->is_on_node = true;
     parser->current_node = node;
@@ -194,7 +199,7 @@ static void expat_EndElementHandler(void *userData,
               const XML_Char *name ) {
   printf("Node: %s\n", name);
   Parser *parser = reinterpret_cast<Parser*>(userData);
-  if (!strcmp(name, "node")) {
+  if (!strcmp(name, "node")) { 
     parser->is_on_node = false;
     parser->current_node = NULL;
   } else if (!strcmp(name, "interface")) {

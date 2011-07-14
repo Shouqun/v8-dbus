@@ -1,7 +1,7 @@
 #include <v8.h>
 
 #include <string>
-
+#include <iostream>
 #include "dbus_library.h"
 
 using namespace std;
@@ -44,15 +44,28 @@ int main(int argc, char **argv)
   string source_file;
   source_file = "dbus_library.js";
   v8::Handle<v8::String> source = ReadFile(source_file);
+  if (source == v8::Undefined()) {
+    cout<<"Error read library script \"dbus_library.js\", please check it\n";
+    return 1;
+  }
   v8::Local<v8::Script> library_func = v8::Script::Compile(source); 
   v8::Local<v8::Value>  library_ret = library_func->Run();
 
   //load the test script file
-  string test_file;
-  test_file = "main.js";
-  v8::Handle<v8::String> test = ReadFile(test_file);
+  string target_file;
+  if (argc > 1) {
+    target_file = argv[1];
+  } else {
+    target_file = "main.js";
+  }
+  v8::Handle<v8::String> test = ReadFile(target_file);
+  if (test == v8::Undefined()) {
+    cout<<"Error read target script file, please check it\n";
+    return 1;
+  }
   v8::Local<v8::Script> test_func = v8::Script::Compile(test);
   v8::Local<v8::Value> test_ret = test_func->Run();
+  return 0L;
 }
 
 

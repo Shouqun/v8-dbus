@@ -269,9 +269,11 @@ v8::Handle<v8::Value> DBusExtension::MainLoop(const v8::Arguments& args) {
   std::cout<<"Get the conneciont object and start message loop\n";
   
   while (true) {
-    dbus_connection_read_write_dispatch(
-          dbus_g_connection_get_connection(connection), -1);
-  }
+//    dbus_connection_read_write_dispatch(
+//          dbus_g_connection_get_connection(connection), -1);
+
+    g_main_context_iteration(g_main_context_default(), false);
+  } 
 
   return v8::Undefined();
 }
@@ -914,17 +916,17 @@ v8::Handle<v8::Value> DBusMethod(const v8::Arguments& args){
 static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
                                             DBusMessage* message,
                                             void *user_data) {
-  std::cout<<"SIGNAL FILTER";
+  std::cout<<"SIGNAL FILTER"<<std::endl;
   if (message == NULL || 
         dbus_message_get_type(message) != DBUS_MESSAGE_TYPE_SIGNAL) {
-    std::cout<<"Not a valid signal";
+    std::cout<<"Not a valid signal"<<std::endl;
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
   //get the interface name and signal name
   const char *interface_str = dbus_message_get_interface(message);
   const char *signal_name_str = dbus_message_get_member(message);
   if (interface_str == NULL || signal_name_str == NULL ) {
-    std::cout<<"Not valid signal parameter";
+    std::cout<<"Not valid signal parameter"<<std::endl;
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }  
 
@@ -979,11 +981,11 @@ static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
   args[0] = arg0; 
 
   //Do call the callback
-  std::cout<<"To call the callback";
+  std::cout<<"To call the callback"<<std::endl;
   callback->Call(callback, 1, args);
 
   if (try_catch.HasCaught()) {
-    std::cout<<"Ooops, Exception on call the callback";
+    std::cout<<"Ooops, Exception on call the callback"<<std::endl;
   } 
 
   return DBUS_HANDLER_RESULT_HANDLED;

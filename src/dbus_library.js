@@ -44,7 +44,8 @@ if (typeof(dbuslib) == 'undefined') {
     dbuslib.main_loop = function(bus) {
         return MainLoop(bus);
     }
-
+    
+    /*
     dbuslib.dispose_interface = function(iface) {
         
         for (var prop in iface)
@@ -53,6 +54,7 @@ if (typeof(dbuslib) == 'undefined') {
             iface[prop] = undefined;
         }
     }
+    */
 
     dbuslib.get_interface = function(bus, bus_name, object_path, interface_name) {
        

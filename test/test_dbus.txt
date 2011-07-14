@@ -1,0 +1,19 @@
+######################################
+# Test for signal
+session = dbuslib.session_bus()
+iface = dbuslib.get_interface(session, "org.designfu.TestService", "/org/designfu/TestService/object", "org.designfu.TestService")
+iface.HelloSignal.onemit= function(args) { console.log("xxxx"); }
+iface.HelloSignal.onemit= function(args) { console.log("xxxx");  console.log(args)}
+iface.HelloSignal.enaled = true
+
+
+#######################################
+# Test for multiple types
+#Test dict as input param
+session = dbuslib.session_bus()
+iface = dbuslib.get_interface(session, "org.freedesktop.DBus.TestSuitePythonService", "/org/freedesktop/DBus/TestSuitePythonObject", "org.freedesktop.DBus.TestSuiteInterface")
+#Test pass dict
+param = {"aaa" : "bbb", "ccc": "ddd"}
+ret = iface.ParamDict(param)
+#test return dict
+iface.ReturnDict(1)

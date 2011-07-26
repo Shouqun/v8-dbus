@@ -147,12 +147,10 @@ def v8_cmd(bld, variant):
 
 #test code program
 def build_v8(bld):
-  print bld.env["staticlib_PATTERN"]
-  source = 'v8/SConstruct ' + bld.path.ant_glob('v8/include/*') + bld.path.ant_glob('v8/src/*');
-  print source
+  print "To build " + ( bld.env["staticlib_PATTERN"] % ('v8') )
   v8 = bld.new_task_gen(
     source        = 'deps/v8/SConstruct ', 
-    target        = 'libv8.a',
+    target        = bld.env["staticlib_PATTERN"] % ('v8'),
     rule          = v8_cmd(bld, "default"), 
     before        = "cxx",
     install_path  = None)

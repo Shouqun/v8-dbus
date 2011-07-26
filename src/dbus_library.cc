@@ -949,7 +949,7 @@ static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
   } 
 
   //create the execution context since its in new context
-  v8::Handle<v8::Context> context = v8::Context::New();
+  v8::Persistent<v8::Context> context = v8::Context::New();
   v8::Context::Scope ctxScope(context); 
   v8::HandleScope scope;
   v8::TryCatch try_catch;
@@ -965,14 +965,17 @@ static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
   if ( callback_enabled == v8::Undefined() 
                       || callback_v == v8::Undefined()) {
     std::cout<<"Callback undefined\n";
+    context.Dispose();
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
   if (! callback_enabled->ToBoolean()->Value()) {
     std::cout<<"Callback not enabled\n";
+    context.Dispose();
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
   if (! callback_v->IsFunction()) {
     std::cout<<"The callback is not a Function\n";
+    context.Dispose();
     return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
 
@@ -991,7 +994,8 @@ static DBusHandlerResult dbus_signal_filter(DBusConnection* connection,
   if (try_catch.HasCaught()) {
     std::cout<<"Ooops, Exception on call the callback"<<std::endl;
   } 
-
+  
+  context.Dispose();
   return DBUS_HANDLER_RESULT_HANDLED;
 }
 
